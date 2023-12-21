@@ -29,6 +29,7 @@ This project initially aimed to model a concept rocket for the Altitude Record T
 1.22 9.81 0.2 0.0 0.0
 # Rocket-specific parameters
 2.0 0.0 0.001 0.005 100 0.01
+```
 
 ## Contributing
 
