@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>REMUS — Rocket Trajectory Simulator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --accent:   #e86c1a;
+      --accent2:  #58a6ff;
+      --text:     #c9d1d9;
+      --muted:    #8b949e;
+      --success:  #3fb950;
+      --danger:   #f85149;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header .logo { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: 2px; }
+    header .subtitle { color: var(--muted); font-size: 13px; }
+
+    /* ── Layout ──────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ─────────────────────────────────── */
+    aside {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .field label { font-size: 12px; color: var(--muted); }
+    .field input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 13px;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { outline: none; border-color: var(--accent2); }
+
+    /* ── Stage cards ─────────────────────────────── */
+    #stages-container { display: flex; flex-direction: column; gap: 12px; }
+
+    .stage-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .stage-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .stage-label { font-weight: 600; color: var(--accent); font-size: 13px; }
+    .btn-remove {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 8px;
+    }
+    .btn-remove:hover { background: rgba(248, 81, 73, 0.1); }
+
+    .stage-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+    }
+
+    /* ── Buttons ─────────────────────────────────── */
+    .btn-add {
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      color: var(--accent2);
+      cursor: pointer;
+      font-size: 13px;
+      padding: 8px;
+      width: 100%;
+      transition: background 0.15s;
+    }
+    .btn-add:hover { background: rgba(88, 166, 255, 0.1); }
+
+    .btn-run {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px;
+      width: 100%;
+      letter-spacing: 0.5px;
+      transition: opacity 0.15s;
+    }
+    .btn-run:hover { opacity: 0.9; }
+    .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Main content ────────────────────────────── */
+    main {
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Stats row ───────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+    .stat-value { font-size: 22px; font-weight: 700; margin-top: 4px; color: var(--text); }
+    .stat-unit  { font-size: 12px; color: var(--muted); }
+
+    /* ── Chart area ──────────────────────────────── */
+    .placeholder {
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 14px;
+      height: 320px;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .chart-card.wide { grid-column: 1 / -1; }
+    .chart-title { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
+    .chart-wrap  { position: relative; height: 240px; }
+
+    /* ── Status / error banner ───────────────────── */
+    .banner {
+      border-radius: 6px;
+      font-size: 13px;
+      padding: 10px 14px;
+      display: none;
+    }
+    .banner.error   { background: rgba(248,81,73,0.12); border: 1px solid var(--danger); color: var(--danger); }
+    .banner.success { background: rgba(63,185,80,0.1);  border: 1px solid var(--success); color: var(--success); }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      aside { border-right: none; border-bottom: 1px solid var(--border); }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .chart-grid { grid-template-columns: 1fr; }
+      .chart-card.wide { grid-column: unset; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">REMUS</span>
+  <span class="subtitle">Rocket Equation Model Using Simulations</span>
+</header>
+
+<div class="layout">
+
+  <!-- ── Parameter sidebar ── -->
+  <aside>
+
+    <!-- Environmental -->
+    <div>
+      <div class="section-title">Environmental Parameters</div>
+      <div class="field">
+        <label>Air Density ρ (kg/m³)</label>
+        <input type="number" id="rho" value="1.22" step="0.01" />
+      </div>
+      <div class="field">
+        <label>Gravity g (m/s²)</label>
+        <input type="number" id="g" value="9.81" step="0.01" />
+      </div>
+      <div class="field">
+        <label>Drag Coefficient Cd</label>
+        <input type="number" id="Cd" value="0.2" step="0.01" />
+      </div>
+      <div class="field">
+        <label>Initial Velocity v₀ (m/s)</label>
+        <input type="number" id="v0" value="0" step="0.1" />
+      </div>
+      <div class="field">
+        <label>Initial Height h₀ (m)</label>
+        <input type="number" id="h0" value="0" step="1" />
+      </div>
+    </div>
+
+    <!-- Rocket stages -->
+    <div>
+      <div class="section-title">Rocket Stages</div>
+      <div id="stages-container"></div>
+      <button class="btn-add" onclick="addStage()">+ Add Stage</button>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div id="banner" class="banner"></div>
+      <button class="btn-run" id="btn-run" onclick="runSimulation()">Run Simulation</button>
+    </div>
+
+  </aside>
+
+  <!-- ── Main content ── -->
+  <main>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Max Altitude</div>
+        <div class="stat-value" id="stat-alt">—</div>
+        <div class="stat-unit">metres</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Terminal Velocity</div>
+        <div class="stat-value" id="stat-vel">—</div>
+        <div class="stat-unit">m/s</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Flight Duration</div>
+        <div class="stat-value" id="stat-time">—</div>
+        <div class="stat-unit">seconds</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Stages</div>
+        <div class="stat-value" id="stat-stages">—</div>
+        <div class="stat-unit">booster stage(s)</div>
+      </div>
+    </div>
+
+    <!-- Charts — hidden until first run -->
+    <div id="placeholder" class="placeholder">
+      Configure parameters and click <strong>&nbsp;Run Simulation&nbsp;</strong> to see results
+    </div>
+
+    <div id="charts" class="chart-grid" style="display:none;">
+      <div class="chart-card wide">
+        <div class="chart-title">Altitude vs Time</div>
+        <div class="chart-wrap"><canvas id="chart-h"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Velocity vs Time</div>
+        <div class="chart-wrap"><canvas id="chart-v"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Mass vs Time</div>
+        <div class="chart-wrap"><canvas id="chart-m"></canvas></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Defaults ────────────────────────────────────────────────────────────────
+// Defaults: 1 kg rocket, 200g propellant, Estes-class motor (thrust ~50N, Isp ~200s)
+const STAGE_DEFAULTS = { m0: 0.2, mR: 0.1, A: 0.0005, mf: 0.05, ue: 500, t: 0.01 };
+const STAGE_FIELDS = [
+  { key: 'm0',  label: 'Initial Mass m₀ (kg)' },
+  { key: 'mR',  label: 'Rocket Mass mR (kg)' },
+  { key: 'A',   label: 'Cross-section A (m²)' },
+  { key: 'mf',  label: 'Mass Flow ṁ (kg/s)' },
+  { key: 'ue',  label: 'Exhaust Vel uₑ (m/s)' },
+  { key: 't',   label: 'Time Step dt (s)' },
+];
+
+let stageCount = 0;
+let charts = {};
+
+// ── Stage management ─────────────────────────────────────────────────────────
+function addStage(defaults = STAGE_DEFAULTS) {
+  stageCount++;
+  const id = stageCount;
+  const container = document.getElementById('stages-container');
+
+  const card = document.createElement('div');
+  card.className = 'stage-card';
+  card.id = `stage-${id}`;
+
+  const header = `
+    <div class="stage-header">
+      <span class="stage-label">Stage ${id}</span>
+      <button class="btn-remove" onclick="removeStage(${id})">Remove</button>
+    </div>`;
+
+  const fields = STAGE_FIELDS.map(f => `
+    <div class="field">
+      <label>${f.label}</label>
+      <input type="number" id="s${id}-${f.key}" value="${defaults[f.key]}" step="any" />
+    </div>`).join('');
+
+  card.innerHTML = header + `<div class="stage-grid">${fields}</div>`;
+  container.appendChild(card);
+  renumberStages();
+}
+
+function removeStage(id) {
+  const card = document.getElementById(`stage-${id}`);
+  if (card) card.remove();
+  renumberStages();
+}
+
+function renumberStages() {
+  document.querySelectorAll('.stage-card').forEach((card, idx) => {
+    card.querySelector('.stage-label').textContent = `Stage ${idx + 1}`;
+  });
+}
+
+function getStages() {
+  return Array.from(document.querySelectorAll('.stage-card')).map(card => {
+    const id = card.id.replace('stage-', '');
+    const val = key => parseFloat(document.getElementById(`s${id}-${key}`).value);
+    return { m0: val('m0'), mR: val('mR'), A: val('A'), mf: val('mf'), ue: val('ue'), t: val('t') };
+  });
+}
+
+// ── Banner ───────────────────────────────────────────────────────────────────
+function showBanner(msg, type) {
+  const el = document.getElementById('banner');
+  el.textContent = msg;
+  el.className = `banner ${type}`;
+  el.style.display = 'block';
+}
+function hideBanner() {
+  document.getElementById('banner').style.display = 'none';
+}
+
+// ── Simulation ───────────────────────────────────────────────────────────────
+async function runSimulation() {
+  hideBanner();
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+
+  const env = {
+    rho: parseFloat(document.getElementById('rho').value),
+    g:   parseFloat(document.getElementById('g').value),
+    Cd:  parseFloat(document.getElementById('Cd').value),
+    v0:  parseFloat(document.getElementById('v0').value),
+    h0:  parseFloat(document.getElementById('h0').value),
+  };
+  const stages = getStages();
+
+  try {
+    const resp = await fetch('/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ env, stages }),
+    });
+    const json = await resp.json();
+
+    if (!resp.ok || json.error) {
+      showBanner(`Error: ${json.error || resp.statusText}`, 'error');
+      return;
+    }
+
+    renderResults(json.data, json.stats);
+    showBanner(`Simulation complete — ${json.data.length} data points`, 'success');
+  } catch (err) {
+    showBanner(`Request failed: ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Simulation';
+  }
+}
+
+// ── Chart helpers ─────────────────────────────────────────────────────────────
+const CHART_OPTS = (yLabel, color) => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: { legend: { display: false } },
+  scales: {
+    x: {
+      type: 'linear',
+      title: { display: true, text: 'Time (s)', color: '#8b949e' },
+      ticks: { color: '#8b949e', maxTicksLimit: 10 },
+      grid: { color: '#21262d' },
+    },
+    y: {
+      title: { display: true, text: yLabel, color: '#8b949e' },
+      ticks: { color: '#8b949e' },
+      grid: { color: '#21262d' },
+    },
+  },
+  elements: { point: { radius: 0 }, line: { borderWidth: 2 } },
+});
+
+function makeDataset(data, key, color) {
+  return {
+    data: data.map(r => ({ x: r.t, y: r[key] })),
+    borderColor: color,
+    backgroundColor: color + '22',
+    fill: true,
+    tension: 0.3,
+  };
+}
+
+function buildOrUpdate(id, data, key, yLabel, color) {
+  const ctx = document.getElementById(id).getContext('2d');
+  if (charts[id]) {
+    charts[id].destroy();
+  }
+  charts[id] = new Chart(ctx, {
+    type: 'line',
+    data: { datasets: [makeDataset(data, key, color)] },
+    options: CHART_OPTS(yLabel, color),
+  });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderResults(data, stats) {
+  // Stats
+  document.getElementById('stat-alt').textContent    = stats.maxAltitude.toLocaleString();
+  document.getElementById('stat-vel').textContent    = stats.terminalVelocity.toFixed(2);
+  document.getElementById('stat-time').textContent   = stats.flightTime.toFixed(1);
+  document.getElementById('stat-stages').textContent = stats.nStages;
+
+  // Show charts, hide placeholder
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('charts').style.display = 'grid';
+
+  buildOrUpdate('chart-h', data, 'h', 'Altitude (m)',  '#58a6ff');
+  buildOrUpdate('chart-v', data, 'v', 'Velocity (m/s)','#e8c14a');
+  buildOrUpdate('chart-m', data, 'm', 'Mass (kg)',      '#3fb950');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+addStage();
+</script>
+</body>
+</html>
